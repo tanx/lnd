@@ -16,7 +16,10 @@ GOACC_BIN := $(GO_BIN)/go-acc
 
 BTCD_DIR :=${GOPATH}/src/$(BTCD_PKG)
 MOBILE_BUILD_DIR :=${GOPATH}/src/$(MOBILE_PKG)/build
-IOS_BUILD := $(MOBILE_BUILD_DIR)/ios/Lndmobile.framework
+IOS_BUILD_DIR := $(MOBILE_BUILD_DIR)/ios
+IOS_BUILD := $(IOS_BUILD_DIR)/Lndmobile.framework
+ANDROID_BUILD_DIR := $(MOBILE_BUILD_DIR)/android
+ANDROID_BUILD := $(ANDROID_BUILD_DIR)/Lndmobile.aar
 
 COMMIT := $(shell git describe --abbrev=40 --dirty)
 LDFLAGS := -ldflags "-X $(PKG)/build.Commit=$(COMMIT)"
@@ -191,7 +194,15 @@ vendor:
 
 ios: vendor
 	@$(call print, "Building iOS framework ($(IOS_BUILD)).")
+	mkdir -p $(IOS_BUILD_DIR)
 	$(GOMOBILE_BIN) bind -target=ios -tags="ios $(DEV_TAGS) experimental" $(LDFLAGS) -v -o $(IOS_BUILD) $(MOBILE_PKG)
+
+android: vendor
+	@$(call print, "Building Android library ($(ANDROID_BUILD)).")
+	mkdir -p $(ANDROID_BUILD_DIR)
+	$(GOMOBILE_BIN) bind -target=android -tags="android $(DEV_TAGS) experimental" $(LDFLAGS) -v -o $(ANDROID_BUILD) $(MOBILE_PKG)
+
+mobile: ios android
 
 clean:
 	@$(call print, "Cleaning source.$(NC)")
@@ -224,4 +235,6 @@ clean:
 	rpc \
 	vendor \
 	ios \
+	android \
+	mobile \
 	clean
