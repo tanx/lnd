@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"net"
 	"net/http"
 	"sort"
 	"strings"
@@ -393,6 +394,8 @@ type rpcServer struct {
 
 	wg sync.WaitGroup
 
+	lis net.Listener
+
 	// subServers are a set of sub-RPC servers that use the same gRPC and
 	// listening sockets as the main RPC server, but which maintain their
 	// own independent service. This allows us to expose a set of
@@ -441,7 +444,7 @@ func newRPCServer(s *server, macService *macaroons.Service,
 	subServerCgs *subRPCServerConfigs, serverOpts []grpc.ServerOption,
 	restDialOpts []grpc.DialOption, restProxyDest string,
 	atpl *autopilot.Manager, invoiceRegistry *invoices.InvoiceRegistry,
-	tower *watchtower.Standalone, tlsCfg *tls.Config) (*rpcServer, error) {
+	tower *watchtower.Standalone, tlsCfg *tls.Config, lis net.Listener) (*rpcServer, error) {
 
 	// Set up router rpc backend.
 	channelGraph := s.chanDB.ChannelGraph()
@@ -572,6 +575,7 @@ func newRPCServer(s *server, macService *macaroons.Service,
 	grpcServer := grpc.NewServer(serverOpts...)
 	rootRPCServer := &rpcServer{
 		restDialOpts:  restDialOpts,
+		lis:           lis,
 		restProxyDest: restProxyDest,
 		subServers:    subServers,
 		tlsCfg:        tlsCfg,
@@ -616,71 +620,82 @@ func (r *rpcServer) Start() error {
 		}
 	}
 
-	// With all the sub-servers started, we'll spin up the listeners for
-	// the main RPC server itself.
-	for _, listener := range cfg.RPCListeners {
-		lis, err := lncfg.ListenOnAddress(listener)
-		if err != nil {
-			ltndLog.Errorf(
-				"RPC server unable to listen on %s", listener,
-			)
-			return err
-		}
-
+	if r.lis != nil {
 		r.listenerCleanUp = append(r.listenerCleanUp, func() {
-			lis.Close()
+			r.lis.Close()
 		})
 
 		go func() {
-			rpcsLog.Infof("RPC server listening on %s", lis.Addr())
-			r.grpcServer.Serve(lis)
+			rpcsLog.Infof("RPC server listening on %s", r.lis.Addr())
+			r.grpcServer.Serve(r.lis)
 		}()
-	}
+	} else {
+		// With all the sub-servers started, we'll spin up the listeners for
+		// the main RPC server itself.
+		for _, listener := range cfg.RPCListeners {
+			lis, err := lncfg.ListenOnAddress(listener)
+			if err != nil {
+				ltndLog.Errorf(
+					"RPC server unable to listen on %s", listener,
+				)
+				return err
+			}
 
-	// If Prometheus monitoring is enabled, start the Prometheus exporter.
-	if cfg.Prometheus.Enabled() {
-		err := monitoring.ExportPrometheusMetrics(
-			r.grpcServer, cfg.Prometheus,
+			r.listenerCleanUp = append(r.listenerCleanUp, func() {
+				lis.Close()
+			})
+
+			go func() {
+				rpcsLog.Infof("RPC server listening on %s", lis.Addr())
+				r.grpcServer.Serve(lis)
+			}()
+		}
+
+		// If Prometheus monitoring is enabled, start the Prometheus exporter.
+		if cfg.Prometheus.Enabled() {
+			err := monitoring.ExportPrometheusMetrics(
+				r.grpcServer, cfg.Prometheus,
+			)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Finally, start the REST proxy for our gRPC server above. We'll ensure
+		// we direct LND to connect to its loopback address rather than a
+		// wildcard to prevent certificate issues when accessing the proxy
+		// externally.
+		//
+		// TODO(roasbeef): eventually also allow the sub-servers to themselves
+		// have a REST proxy.
+		mux := proxy.NewServeMux()
+
+		err := lnrpc.RegisterLightningHandlerFromEndpoint(
+			context.Background(), mux, r.restProxyDest,
+			r.restDialOpts,
 		)
 		if err != nil {
 			return err
 		}
-	}
+		for _, restEndpoint := range cfg.RESTListeners {
+			lis, err := lncfg.TLSListenOnAddress(restEndpoint, r.tlsCfg)
+			if err != nil {
+				ltndLog.Errorf(
+					"gRPC proxy unable to listen on %s",
+					restEndpoint,
+				)
+				return err
+			}
 
-	// Finally, start the REST proxy for our gRPC server above. We'll ensure
-	// we direct LND to connect to its loopback address rather than a
-	// wildcard to prevent certificate issues when accessing the proxy
-	// externally.
-	//
-	// TODO(roasbeef): eventually also allow the sub-servers to themselves
-	// have a REST proxy.
-	mux := proxy.NewServeMux()
+			r.listenerCleanUp = append(r.listenerCleanUp, func() {
+				lis.Close()
+			})
 
-	err := lnrpc.RegisterLightningHandlerFromEndpoint(
-		context.Background(), mux, r.restProxyDest,
-		r.restDialOpts,
-	)
-	if err != nil {
-		return err
-	}
-	for _, restEndpoint := range cfg.RESTListeners {
-		lis, err := lncfg.TLSListenOnAddress(restEndpoint, r.tlsCfg)
-		if err != nil {
-			ltndLog.Errorf(
-				"gRPC proxy unable to listen on %s",
-				restEndpoint,
-			)
-			return err
+			go func() {
+				rpcsLog.Infof("gRPC proxy started at %s", lis.Addr())
+				http.Serve(lis, mux)
+			}()
 		}
-
-		r.listenerCleanUp = append(r.listenerCleanUp, func() {
-			lis.Close()
-		})
-
-		go func() {
-			rpcsLog.Infof("gRPC proxy started at %s", lis.Addr())
-			http.Serve(lis, mux)
-		}()
 	}
 
 	return nil
