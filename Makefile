@@ -179,6 +179,7 @@ list:
 rpc:
 	@$(call print, "Compiling protos.")
 	cd ./lnrpc; ./gen_protos.sh
+	cd ./mobile; ./gen_bindings.sh
 
 clean:
 	@$(call print, "Cleaning source.$(NC)")
