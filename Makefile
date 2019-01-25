@@ -190,7 +190,7 @@ rpc:
 
 vendor:
 	@$(call print, "Re-creating vendor directory.")
-	rm -r vendor/; go mod vendor
+	rm -r vendor/; GO111MODULE=on go mod vendor
 
 ios: vendor
 	@$(call print, "Building iOS framework ($(IOS_BUILD)).")
