@@ -7,6 +7,12 @@ import (
 
 	flags "github.com/jessevdk/go-flags"
 	"github.com/lightningnetwork/lnd"
+	"google.golang.org/grpc/test/bufconn"
+)
+
+var (
+	lightningLis      = bufconn.Listen(100)
+	walletUnlockerLis = bufconn.Listen(100)
 )
 
 func Start(extraArgs string, callback Callback) {
@@ -17,7 +23,7 @@ func Start(extraArgs string, callback Callback) {
 	// Call the "real" main in a nested manner so the defers will properly
 	// be executed in the case of a graceful shutdown.
 	go func() {
-		if err := lnd.Main(bufWalletUnlockerLis, bufLightningLis); err != nil {
+		if err := lnd.Main(walletUnlockerLis, lightningLis); err != nil {
 			if e, ok := err.(*flags.Error); ok &&
 				e.Type == flags.ErrHelp {
 			} else {
