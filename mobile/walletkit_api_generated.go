@@ -59,7 +59,7 @@ func getWalletKitClient() (walletrpc.WalletKitClient, func(), error) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func WalletKitDeriveNextKey(msg []byte, callback Callback) {
+func DeriveNextKey(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &walletrpc.KeyReq{}
@@ -86,7 +86,7 @@ func WalletKitDeriveNextKey(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func WalletKitDeriveKey(msg []byte, callback Callback) {
+func DeriveKey(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &signrpc.KeyLocator{}
@@ -112,7 +112,7 @@ func WalletKitDeriveKey(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func WalletKitNextAddr(msg []byte, callback Callback) {
+func NextAddr(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &walletrpc.AddrRequest{}
@@ -141,7 +141,7 @@ func WalletKitNextAddr(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func WalletKitPublishTransaction(msg []byte, callback Callback) {
+func PublishTransaction(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &walletrpc.Transaction{}
@@ -169,7 +169,7 @@ func WalletKitPublishTransaction(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func WalletKitSendOutputs(msg []byte, callback Callback) {
+func SendOutputs(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &walletrpc.SendOutputsRequest{}
@@ -197,7 +197,7 @@ func WalletKitSendOutputs(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func WalletKitEstimateFee(msg []byte, callback Callback) {
+func EstimateFee(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &walletrpc.EstimateFeeRequest{}

@@ -38,7 +38,7 @@ do
     filename=$(basename ${file})
     service=${filename%.proto}
     build_tags="// +build $tag"
-    use_prefix="1"
+    use_prefix="0"
     lis="$service=lightningLis"
 
     opts="package_name=$pkg,target_package=$target_pkg/$tag,build_tags=$build_tags,api_prefix=$use_prefix,listeners=$lis"

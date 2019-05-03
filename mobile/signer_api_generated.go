@@ -64,7 +64,7 @@ func getSignerClient() (signrpc.SignerClient, func(), error) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func SignerSignOutputRaw(msg []byte, callback Callback) {
+func SignOutputRaw(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &signrpc.SignReq{}
@@ -99,7 +99,7 @@ func SignerSignOutputRaw(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func SignerComputeInputScript(msg []byte, callback Callback) {
+func ComputeInputScript(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &signrpc.SignReq{}

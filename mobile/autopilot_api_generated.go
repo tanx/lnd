@@ -57,7 +57,7 @@ func getAutopilotClient() (autopilotrpc.AutopilotClient, func(), error) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func AutopilotStatus(msg []byte, callback Callback) {
+func Status(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &autopilotrpc.StatusRequest{}
@@ -84,7 +84,7 @@ func AutopilotStatus(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func AutopilotModifyStatus(msg []byte, callback Callback) {
+func ModifyStatus(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &autopilotrpc.ModifyStatusRequest{}
@@ -112,7 +112,7 @@ func AutopilotModifyStatus(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func AutopilotQueryScores(msg []byte, callback Callback) {
+func QueryScores(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &autopilotrpc.QueryScoresRequest{}
@@ -139,7 +139,7 @@ func AutopilotQueryScores(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func AutopilotSetScores(msg []byte, callback Callback) {
+func SetScores(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &autopilotrpc.SetScoresRequest{}

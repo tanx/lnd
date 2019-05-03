@@ -60,7 +60,7 @@ func getRouterClient() (routerrpc.RouterClient, func(), error) {
 // NOTE: This method produces a stream of responses, and the receive stream can
 // be called zero or more times. After EOF error is returned, no more responses
 // will be produced.
-func RouterSendPayment(msg []byte, rStream RecvStream) {
+func SendPayment(msg []byte, rStream RecvStream) {
 	s := &readStreamHandler{
 		newProto: func() proto.Message {
 			return &routerrpc.SendPaymentRequest{}
@@ -96,7 +96,7 @@ func RouterSendPayment(msg []byte, rStream RecvStream) {
 // NOTE: This method produces a stream of responses, and the receive stream can
 // be called zero or more times. After EOF error is returned, no more responses
 // will be produced.
-func RouterTrackPayment(msg []byte, rStream RecvStream) {
+func TrackPayment(msg []byte, rStream RecvStream) {
 	s := &readStreamHandler{
 		newProto: func() proto.Message {
 			return &routerrpc.TrackPaymentRequest{}
@@ -131,7 +131,7 @@ func RouterTrackPayment(msg []byte, rStream RecvStream) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func RouterEstimateRouteFee(msg []byte, callback Callback) {
+func EstimateRouteFee(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &routerrpc.RouteFeeRequest{}
@@ -159,7 +159,7 @@ func RouterEstimateRouteFee(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func RouterSendToRoute(msg []byte, callback Callback) {
+func SendToRoute(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &routerrpc.SendToRouteRequest{}
@@ -186,7 +186,7 @@ func RouterSendToRoute(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func RouterResetMissionControl(msg []byte, callback Callback) {
+func ResetMissionControl(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &routerrpc.ResetMissionControlRequest{}
@@ -213,7 +213,7 @@ func RouterResetMissionControl(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func RouterQueryMissionControl(msg []byte, callback Callback) {
+func QueryMissionControl(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &routerrpc.QueryMissionControlRequest{}
