@@ -60,7 +60,7 @@ func getInvoicesClient() (invoicesrpc.InvoicesClient, func(), error) {
 // NOTE: This method produces a stream of responses, and the receive stream can
 // be called zero or more times. After EOF error is returned, no more responses
 // will be produced.
-func InvoicesSubscribeSingleInvoice(msg []byte, rStream RecvStream) {
+func SubscribeSingleInvoice(msg []byte, rStream RecvStream) {
 	s := &readStreamHandler{
 		newProto: func() proto.Message {
 			return &invoicesrpc.SubscribeSingleInvoiceRequest{}
@@ -96,7 +96,7 @@ func InvoicesSubscribeSingleInvoice(msg []byte, rStream RecvStream) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func InvoicesCancelInvoice(msg []byte, callback Callback) {
+func CancelInvoice(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &invoicesrpc.CancelInvoiceMsg{}
@@ -123,7 +123,7 @@ func InvoicesCancelInvoice(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func InvoicesAddHoldInvoice(msg []byte, callback Callback) {
+func AddHoldInvoice(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &invoicesrpc.AddHoldInvoiceRequest{}
@@ -150,7 +150,7 @@ func InvoicesAddHoldInvoice(msg []byte, callback Callback) {
 //
 // NOTE: This method produces a single result or error, and the callback will
 // be called only once.
-func InvoicesSettleInvoice(msg []byte, callback Callback) {
+func SettleInvoice(msg []byte, callback Callback) {
 	s := &syncHandler{
 		newProto: func() proto.Message {
 			return &invoicesrpc.SettleInvoiceMsg{}
