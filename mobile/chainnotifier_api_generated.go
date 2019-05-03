@@ -64,7 +64,7 @@ func getChainNotifierClient() (chainrpc.ChainNotifierClient, func(), error) {
 // NOTE: This method produces a stream of responses, and the receive stream can
 // be called zero or more times. After EOF error is returned, no more responses
 // will be produced.
-func ChainNotifierRegisterConfirmationsNtfn(msg []byte, rStream RecvStream) {
+func RegisterConfirmationsNtfn(msg []byte, rStream RecvStream) {
 	s := &readStreamHandler{
 		newProto: func() proto.Message {
 			return &chainrpc.ConfRequest{}
@@ -104,7 +104,7 @@ func ChainNotifierRegisterConfirmationsNtfn(msg []byte, rStream RecvStream) {
 // NOTE: This method produces a stream of responses, and the receive stream can
 // be called zero or more times. After EOF error is returned, no more responses
 // will be produced.
-func ChainNotifierRegisterSpendNtfn(msg []byte, rStream RecvStream) {
+func RegisterSpendNtfn(msg []byte, rStream RecvStream) {
 	s := &readStreamHandler{
 		newProto: func() proto.Message {
 			return &chainrpc.SpendRequest{}
@@ -147,7 +147,7 @@ func ChainNotifierRegisterSpendNtfn(msg []byte, rStream RecvStream) {
 // NOTE: This method produces a stream of responses, and the receive stream can
 // be called zero or more times. After EOF error is returned, no more responses
 // will be produced.
-func ChainNotifierRegisterBlockEpochNtfn(msg []byte, rStream RecvStream) {
+func RegisterBlockEpochNtfn(msg []byte, rStream RecvStream) {
 	s := &readStreamHandler{
 		newProto: func() proto.Message {
 			return &chainrpc.BlockEpoch{}
