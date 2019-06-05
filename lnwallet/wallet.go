@@ -69,6 +69,13 @@ type InitFundingReserveMsg struct {
 	// workflow.
 	NodeAddr net.Addr
 
+	// LocalSpendAmt should be set to the amount we intend to spend when
+	// opening the channel. This can be used for instance to use all our
+	// remaining funds to open the channel, since it will take fees into
+	// account. Can currently only be used when LocalFundingAmt and
+	// RemoteFundingAmt are set to 0.
+	LocalSpendAmt btcutil.Amount
+
 	// LocalFundingAmnt is the amount of funds requested from us for this
 	// channel.
 	LocalFundingAmt btcutil.Amount
@@ -432,8 +439,16 @@ func (l *LightningWallet) InitChannelReservation(
 // validate a funding reservation request.
 func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg) {
 	// It isn't possible to create a channel with zero funds committed.
-	if req.LocalFundingAmt+req.RemoteFundingAmt == 0 {
+	if req.LocalFundingAmt+req.RemoteFundingAmt+req.LocalSpendAmt == 0 {
 		err := ErrZeroCapacity()
+		req.err <- err
+		req.resp <- nil
+		return
+	}
+
+	if req.LocalFundingAmt+req.RemoteFundingAmt > 0 && req.LocalSpendAmt > 0 {
+		err := fmt.Errorf("local and remote fund amt must be zero " +
+			"when local spend amount is specified")
 		req.err <- err
 		req.resp <- nil
 		return
@@ -470,9 +485,27 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 	capacity := req.RemoteFundingAmt
 	localFundingAmt := btcutil.Amount(0)
 
+	switch {
+
+	// If we are attempting to use a given amount of our remaining funds to
+	// open the channel, select coins to spend this amount.
+	case req.LocalSpendAmt > 0:
+		coins, change, localFundingAmt, unlock, err = l.selectCoinsToSpend(
+			req.FundingFeePerKw, req.LocalSpendAmt, req.MinConfs,
+		)
+		if err != nil {
+			req.err <- err
+			req.resp <- nil
+			return
+		}
+
+		// The total channel capacity will be the size of the funding
+		// output we created.
+		capacity = localFundingAmt
+
 	// Otherwise, attempt to obtain enough coins to meet the required
 	// funding amount.
-	if req.LocalFundingAmt != 0 {
+	case req.LocalFundingAmt != 0:
 		// Coin selection is done on the basis of sat/kw, so we'll use
 		// the fee rate passed in to perform coin selection.
 		var err error
@@ -1303,6 +1336,10 @@ func (l *LightningWallet) WithCoinSelectLock(f func() error) error {
 // successful/possible, then the selected coins and change outputs are
 // returned. This method locks the selected outputs, and a function closure to
 // unlock them in case of an error is returned.
+//
+// NOTE: This method is different from selectCoinsToSpend in the way that it is
+// targetting a specific funding output size, instead of spending a given
+// amount when selecting coins.
 func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 	amt btcutil.Amount, minConfs int32) ([]*wire.TxIn, []*wire.TxOut,
 	func(), error) {
@@ -1378,6 +1415,119 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 	}
 
 	return inputs, changeOutputs, unlock, nil
+}
+
+// selectCoinsToSpend performs coin selection in order to spend exactly
+// 'toSpend' creating the funding tx. If necessary, a change address will also
+// be generated. If coin selection is successful/possible, then the selected
+// coins and change outputs are returned, and the value of the resulting
+// funding output. This method locks the selected outputs, and a function
+// closure to unlock them in case of an error is returned.
+//
+// NOTE: This method is different from selectCoinsAndChange in the way that it
+// spends the given amount when selecting coins, instead of targetting a
+// specific funding output size.
+func (l *LightningWallet) selectCoinsToSpend(feeRate SatPerKWeight,
+	toSpend btcutil.Amount, minConfs int32) ([]*wire.TxIn, []*wire.TxOut,
+	btcutil.Amount, func(), error) {
+
+	// We hold the coin select mutex while querying for outputs, and
+	// performing coin selection in order to avoid inadvertent double
+	// spends across funding transactions.
+	l.coinSelectMtx.Lock()
+	defer l.coinSelectMtx.Unlock()
+
+	walletLog.Infof("Selecting coins for funding tx targetting spend of "+
+		"%v using %v sat/kw as fee rate", toSpend, int64(feeRate))
+
+	// Find all unlocked unspent witness outputs that satisfy the minimum
+	// number of confirmations required.
+	allCoins, err := l.ListUnspentWitness(minConfs, math.MaxInt32)
+	if err != nil {
+		return nil, nil, 0, nil, err
+	}
+
+	// Grab a set of utxos that is at least toSpend in total value.
+	totalSat, selectedUtxos, err := selectInputs(toSpend, allCoins)
+	if err != nil {
+		return nil, nil, 0, nil, err
+	}
+
+	var weightEstimate input.TxWeightEstimator
+	for _, utxo := range selectedUtxos {
+		switch utxo.AddressType {
+		case WitnessPubKey:
+			weightEstimate.AddP2WKHInput()
+		case NestedWitnessPubKey:
+			weightEstimate.AddNestedP2WKHInput()
+		default:
+			return nil, nil, 0, nil, fmt.Errorf("Unsupported "+
+				"address type: %v", utxo.AddressType)
+		}
+	}
+
+	// Channel funding multisig output is P2WSH.
+	weightEstimate.AddP2WSHOutput()
+
+	// Check how big the change output would be if we were to add it.
+	changeAmt := totalSat - toSpend
+
+	// If the resulting change amount is above the dust limit, then we
+	// create a change output.
+	var changeOutputs []*wire.TxOut
+	if changeAmt != 0 && changeAmt > DefaultDustLimit() {
+		changeAddr, err := l.NewAddress(WitnessPubKey, true)
+		if err != nil {
+			return nil, nil, 0, nil, err
+		}
+		changeScript, err := txscript.PayToAddrScript(changeAddr)
+		if err != nil {
+			return nil, nil, 0, nil, err
+		}
+
+		changeOutputs = make([]*wire.TxOut, 1)
+		changeOutputs[0] = &wire.TxOut{
+			Value:    int64(changeAmt),
+			PkScript: changeScript,
+		}
+		weightEstimate.AddP2WKHOutput()
+	} else {
+		changeAmt = 0
+	}
+
+	// Now that we have an estimate for the transaction size, we can
+	// calculate the final fee.
+	totalWeight := int64(weightEstimate.Weight())
+	fee := feeRate.FeeForWeight(totalWeight)
+
+	// Lock the selected coins. These coins are now "reserved", this
+	// prevents concurrent funding requests from referring to and this
+	// double-spending the same set of coins.
+	inputs := make([]*wire.TxIn, len(allCoins))
+	for i, coin := range selectedUtxos {
+		outpoint := &coin.OutPoint
+		l.lockedOutPoints[*outpoint] = struct{}{}
+		l.LockOutpoint(*outpoint)
+
+		// Empty sig script, we'll actually sign if this reservation is
+		// queued up to be completed (the other side accepts).
+		inputs[i] = wire.NewTxIn(outpoint, nil, nil)
+	}
+
+	unlock := func() {
+		l.coinSelectMtx.Lock()
+		defer l.coinSelectMtx.Unlock()
+
+		for _, coin := range selectedUtxos {
+			outpoint := &coin.OutPoint
+			delete(l.lockedOutPoints, *outpoint)
+			l.UnlockOutpoint(*outpoint)
+		}
+	}
+
+	// We return the selected inputs together with the value of the final
+	// funding output.
+	return inputs, changeOutputs, toSpend - fee, unlock, nil
 }
 
 // DeriveStateHintObfuscator derives the bytes to be used for obfuscating the
