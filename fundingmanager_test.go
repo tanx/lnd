@@ -236,7 +236,7 @@ func createTestWallet(cdb *channeldb.DB, netParams *chaincfg.Params,
 }
 
 func createTestFundingManager(t *testing.T, privKey *btcec.PrivateKey,
-	addr *lnwire.NetAddress, maxPending int, tempTestDir string,
+	addr *lnwire.NetAddress, tempTestDir string,
 	options ...cfgOption) (*testNode, error) {
 
 	netParams := activeNetParams.Params
@@ -364,7 +364,7 @@ func createTestFundingManager(t *testing.T, privKey *btcec.PrivateKey,
 		},
 		ZombieSweeperInterval:  1 * time.Hour,
 		ReservationTimeout:     1 * time.Nanosecond,
-		MaxPendingChannels:     maxPending,
+		MaxPendingChannels:     DefaultMaxPendingChannels,
 		NotifyOpenChannelEvent: func(wire.OutPoint) {},
 	}
 
@@ -478,7 +478,7 @@ func recreateAliceFundingManager(t *testing.T, alice *testNode) {
 
 type cfgOption func(*fundingConfig)
 
-func setupFundingManagers(t *testing.T, maxPendingChannels int,
+func setupFundingManagers(t *testing.T,
 	options ...cfgOption) (*testNode, *testNode) {
 
 	aliceTestDir, err := ioutil.TempDir("", "alicelnwallet")
@@ -487,8 +487,7 @@ func setupFundingManagers(t *testing.T, maxPendingChannels int,
 	}
 
 	alice, err := createTestFundingManager(
-		t, alicePrivKey, aliceAddr, maxPendingChannels, aliceTestDir,
-		options...,
+		t, alicePrivKey, aliceAddr, aliceTestDir, options...,
 	)
 	if err != nil {
 		t.Fatalf("failed creating fundingManager: %v", err)
@@ -500,8 +499,7 @@ func setupFundingManagers(t *testing.T, maxPendingChannels int,
 	}
 
 	bob, err := createTestFundingManager(
-		t, bobPrivKey, bobAddr, maxPendingChannels, bobTestDir,
-		options...,
+		t, bobPrivKey, bobAddr, bobTestDir, options...,
 	)
 	if err != nil {
 		t.Fatalf("failed creating fundingManager: %v", err)
@@ -1039,7 +1037,7 @@ func assertHandleFundingLocked(t *testing.T, alice, bob *testNode) {
 }
 
 func TestFundingManagerNormalWorkflow(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -1112,7 +1110,7 @@ func TestFundingManagerNormalWorkflow(t *testing.T) {
 }
 
 func TestFundingManagerRestartBehavior(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// Run through the process of opening the channel, up until the funding
@@ -1250,7 +1248,7 @@ func TestFundingManagerRestartBehavior(t *testing.T) {
 // server to notify when the peer comes online, in case sending the
 // fundingLocked message fails the first time.
 func TestFundingManagerOfflinePeer(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// Run through the process of opening the channel, up until the funding
@@ -1384,7 +1382,7 @@ func TestFundingManagerOfflinePeer(t *testing.T) {
 // will properly clean up a zombie reservation that times out after the
 // initFundingMsg has been handled.
 func TestFundingManagerPeerTimeoutAfterInitFunding(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -1444,7 +1442,7 @@ func TestFundingManagerPeerTimeoutAfterInitFunding(t *testing.T) {
 // will properly clean up a zombie reservation that times out after the
 // fundingOpenMsg has been handled.
 func TestFundingManagerPeerTimeoutAfterFundingOpen(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -1513,7 +1511,7 @@ func TestFundingManagerPeerTimeoutAfterFundingOpen(t *testing.T) {
 // will properly clean up a zombie reservation that times out after the
 // fundingAcceptMsg has been handled.
 func TestFundingManagerPeerTimeoutAfterFundingAccept(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -1587,7 +1585,7 @@ func TestFundingManagerPeerTimeoutAfterFundingAccept(t *testing.T) {
 }
 
 func TestFundingManagerFundingTimeout(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -1632,7 +1630,7 @@ func TestFundingManagerFundingTimeout(t *testing.T) {
 // the channel initiator, that it does not timeout when the lnd restarts.
 func TestFundingManagerFundingNotTimeoutInitiator(t *testing.T) {
 
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -1699,7 +1697,7 @@ func TestFundingManagerFundingNotTimeoutInitiator(t *testing.T) {
 // continues to operate as expected in case we receive a duplicate fundingLocked
 // message.
 func TestFundingManagerReceiveFundingLockedTwice(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -1791,7 +1789,7 @@ func TestFundingManagerReceiveFundingLockedTwice(t *testing.T) {
 // handles receiving a fundingLocked after the its own fundingLocked and channel
 // announcement is sent and gets restarted.
 func TestFundingManagerRestartAfterChanAnn(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -1868,7 +1866,7 @@ func TestFundingManagerRestartAfterChanAnn(t *testing.T) {
 // fundingManager continues to operate as expected after it has received
 // fundingLocked and then gets restarted.
 func TestFundingManagerRestartAfterReceivingFundingLocked(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -1941,7 +1939,7 @@ func TestFundingManagerRestartAfterReceivingFundingLocked(t *testing.T) {
 // (a channel not supposed to be announced to the rest of the network),
 // the announcementSignatures nor the nodeAnnouncement messages are sent.
 func TestFundingManagerPrivateChannel(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -2043,7 +2041,7 @@ func TestFundingManagerPrivateChannel(t *testing.T) {
 // announcement signatures nor the node announcement messages are sent upon
 // restart.
 func TestFundingManagerPrivateRestart(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// We will consume the channel updates as we go, so no buffering is needed.
@@ -2165,7 +2163,7 @@ func TestFundingManagerPrivateRestart(t *testing.T) {
 // TestFundingManagerCustomChannelParameters checks that custom requirements we
 // specify during the channel funding flow is preserved correcly on both sides.
 func TestFundingManagerCustomChannelParameters(t *testing.T) {
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// This is the custom parameters we'll use.
@@ -2395,7 +2393,11 @@ func TestFundingManagerCustomChannelParameters(t *testing.T) {
 func TestFundingManagerMaxPendingChannels(t *testing.T) {
 	const maxPending = 4
 
-	alice, bob := setupFundingManagers(t, maxPending)
+	alice, bob := setupFundingManagers(
+		t, func(cfg *fundingConfig) {
+			cfg.MaxPendingChannels = maxPending
+		},
+	)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// Create openChanReqs for maxPending+1 channels.
@@ -2556,7 +2558,7 @@ func TestFundingManagerMaxPendingChannels(t *testing.T) {
 func TestFundingManagerRejectPush(t *testing.T) {
 	// Enable 'rejectpush' option and initialize funding managers.
 	alice, bob := setupFundingManagers(
-		t, DefaultMaxPendingChannels, func(cfg *fundingConfig) {
+		t, func(cfg *fundingConfig) {
 			cfg.RejectPush = true
 		},
 	)
@@ -2616,7 +2618,7 @@ func TestFundingManagerRejectPush(t *testing.T) {
 func TestFundingManagerMaxConfs(t *testing.T) {
 	t.Parallel()
 
-	alice, bob := setupFundingManagers(t, DefaultMaxPendingChannels)
+	alice, bob := setupFundingManagers(t)
 	defer tearDownFundingManagers(t, alice, bob)
 
 	// Create a funding request and start the workflow.
