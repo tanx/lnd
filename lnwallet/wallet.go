@@ -455,7 +455,7 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 	}
 
 	if req.LocalFundingAmt > 0 && req.RemoteFundingAmt > 0 {
-		err := fmt.Errorf("Dual funding not yet supported")
+		err := fmt.Errorf("dual funding not yet supported")
 		req.err <- err
 		req.resp <- nil
 		return
