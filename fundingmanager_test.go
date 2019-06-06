@@ -2737,7 +2737,7 @@ func TestFundingManagerFundAll(t *testing.T) {
 	// We set up our mock wallet to control a list of UTXOs that sum to
 	// less than the max channel size.
 	allCoins := []*lnwallet.Utxo{
-		&lnwallet.Utxo{
+		{
 			AddressType: lnwallet.WitnessPubKey,
 			Value: btcutil.Amount(
 				0.05 * btcutil.SatoshiPerBitcoin,
@@ -2748,7 +2748,7 @@ func TestFundingManagerFundAll(t *testing.T) {
 				Index: 0,
 			},
 		},
-		&lnwallet.Utxo{
+		{
 			AddressType: lnwallet.WitnessPubKey,
 			Value: btcutil.Amount(
 				0.06 * btcutil.SatoshiPerBitcoin,
