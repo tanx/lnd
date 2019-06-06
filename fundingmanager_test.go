@@ -2814,7 +2814,7 @@ func TestFundingManagerFundAll(t *testing.T) {
 
 		// Inputs should be all funds in the wallet.
 		if len(fundingTx.TxIn) != len(allCoins) {
-			t.Fatalf("Fad %d inputs, expected %d",
+			t.Fatalf("Had %d inputs, expected %d",
 				len(fundingTx.TxIn), len(allCoins))
 		}
 	}
