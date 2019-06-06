@@ -447,7 +447,7 @@ func (l *LightningWallet) handleFundingReserveRequest(req *InitFundingReserveMsg
 	}
 
 	if req.LocalFundingAmt+req.RemoteFundingAmt > 0 && req.LocalSpendAmt > 0 {
-		err := fmt.Errorf("Local and remote fund amt must be zero " +
+		err := fmt.Errorf("local and remote fund amt must be zero " +
 			"when local spend amount is specified")
 		req.err <- err
 		req.resp <- nil
