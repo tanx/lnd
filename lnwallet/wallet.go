@@ -1315,20 +1315,6 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 		return nil, nil, nil, err
 	}
 
-	// Lock the selected coins. These coins are now "reserved", this
-	// prevents concurrent funding requests from referring to and this
-	// double-spending the same set of coins.
-	inputs := make([]*wire.TxIn, len(selectedCoins))
-	for i, coin := range selectedCoins {
-		outpoint := &coin.OutPoint
-		l.lockedOutPoints[*outpoint] = struct{}{}
-		l.LockOutpoint(*outpoint)
-
-		// Empty sig script, we'll actually sign if this reservation is
-		// queued up to be completed (the other side accepts).
-		inputs[i] = wire.NewTxIn(outpoint, nil, nil)
-	}
-
 	// Record any change output(s) generated as a result of the coin
 	// selection, but only if the addition of the output won't lead to the
 	// creation of dust.
@@ -1348,6 +1334,20 @@ func (l *LightningWallet) selectCoinsAndChange(feeRate SatPerKWeight,
 			Value:    int64(changeAmt),
 			PkScript: changeScript,
 		}
+	}
+
+	// Lock the selected coins. These coins are now "reserved", this
+	// prevents concurrent funding requests from referring to and this
+	// double-spending the same set of coins.
+	inputs := make([]*wire.TxIn, len(selectedCoins))
+	for i, coin := range selectedCoins {
+		outpoint := &coin.OutPoint
+		l.lockedOutPoints[*outpoint] = struct{}{}
+		l.LockOutpoint(*outpoint)
+
+		// Empty sig script, we'll actually sign if this reservation is
+		// queued up to be completed (the other side accepts).
+		inputs[i] = wire.NewTxIn(outpoint, nil, nil)
 	}
 
 	unlock := func() {
